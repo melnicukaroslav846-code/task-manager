@@ -618,12 +618,25 @@ $('courses').addEventListener('keydown',function(e){
 load();switchView('tasks');render();preview();inp.focus();
 })();
 
-// Реєстрація Service Worker
+// Реєстрація Service Worker + автоматичне оновлення застосунку при виявленні змін
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js')
-      .then(() => console.log('PWA Service Worker зареєстровано'))
-      .catch((err) => console.error('Помилка реєстрації SW:', err));
+    navigator.serviceWorker.register('./sw.js').then((reg) => {
+      console.log('PWA Service Worker зареєстровано');
+
+      // Перевіряти наявність оновлень на сервері при кожному відкритті
+      reg.update();
+
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // Як тільки скачався новий код — сторінка оновлюється сама
+            window.location.reload();
+          }
+        });
+      });
+    }).catch((err) => console.error('Помилка реєстрації SW:', err));
   });
 }
 </script>

@@ -1,36 +1,35 @@
-const CACHE_NAME = 'actionhub-cache-v1';
-const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './manifest.json',
-  './icon-192.png',
-  './icon-512.png'
-];
+const CACHE_NAME = 'mshub-cache-v' + Date.now(); // Кожен білд матиме унікальний кеш
 
-// Встановлення: кешуємо файли
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
-  );
+  // Миттєво активувати новий Service Worker, не чекаючи закриття вкладок
   self.skipWaiting();
 });
 
-// Активація: очищення старих кешів при оновленні
 self.addEventListener('activate', (event) => {
   event.waitUntil(
+    // Видаляємо всі старі кеші автоматично
     caches.keys().then((keys) => {
       return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            return caches.delete(key);
+          }
+        })
       );
-    })
+    }).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// Перехоплення запитів: спочатку шукаємо в кеші, якщо немає — запит в мережу
 self.addEventListener('fetch', (event) => {
+  // Стратегія Network First для HTML: спершу беремо свіжу версію з мережі!
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Для решти ресурсів: шукаємо в кеші, якщо немає — вантажимо з мережі
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       return cachedResponse || fetch(event.request);
